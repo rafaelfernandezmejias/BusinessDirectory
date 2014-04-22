@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!--The viewport meta tag is used to improve the presentation and behavior of the samples 
+      on iOS devices-->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title>St. John's Business Directory</title>
+
+    <link rel="stylesheet" href="http://js.arcgis.com/3.9/js/dojo/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.9/js/esri/css/esri.css">
+    <style>
+      html, body { 
+        height: 100%; width: 100%;
+        margin: 0; padding: 0;
+      } 
+      #map{ 
+        padding:0;
+        border:solid 1px #343642;
+        margin:5px 5px 5px 0px;
+      }
+      #toggleMap{
+        width:60px;
+        height:60px;
+        z-index: 10;
+        position: absolute;
+        right: 5px;
+        top: 5px;
+        border:solid 2px #343642;
+      }
+     </style>
+     
+     <script type="text/javascript">
+         String.prototype.toTitleCase = function() {
+             var i, j, str, lowers, uppers;
+             str = this.replace(/([^\W_]+[^\s-]*) */g, function(txt) {
+                 return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+             });
+
+             // Certain minor words should be left lowercase unless 
+             // they are the first or last words in the string
+             lowers = ['A', 'An', 'The', 'And', 'But', 'Or', 'For', 'Nor', 'As', 'At',
+  'By', 'For', 'From', 'In', 'Into', 'Near', 'Of', 'On', 'Onto', 'To', 'With'];
+             for (i = 0, j = lowers.length; i < j; i++)
+                 str = str.replace(new RegExp('\\s' + lowers[i] + '\\s', 'g'),
+      function(txt) {
+          return txt.toLowerCase();
+      });
+
+             // Certain words such as initialisms or acronyms should be left uppercase
+             uppers = ['Id', 'Tv'];
+             for (i = 0, j = uppers.length; i < j; i++)
+                 str = str.replace(new RegExp('\\b' + uppers[i] + '\\b', 'g'),
+       uppers[i].toUpperCase());
+
+             return str;
+         }
+     </script>
+
+    <script src="http://js.arcgis.com/3.9/"></script>
+    <script>
+      var map, locator;
+      var ortho;
+      var strBusinessName;
+      var strSecAddInd;
+      var strUnit;
+      var strSecondAddress;
+
+      require([
+        "esri/map", "esri/geometry/Extent", "esri/layers/ArcGISTiledMapServiceLayer", "esri/tasks/locator", "esri/graphic",
+        "esri/InfoTemplate", "esri/symbols/SimpleMarkerSymbol", "esri/symbols/PictureMarkerSymbol",
+        "esri/symbols/Font", "esri/symbols/TextSymbol",
+        "dojo/_base/array", "esri/Color",
+        "dojo/number", "dojo/parser", "dojo/dom", "dijit/registry",
+
+        "dijit/form/Button", "dijit/form/Textarea",
+        "dijit/layout/BorderContainer", "dijit/layout/ContentPane", "dojo/domReady!"
+      ], function(
+        Map, Extent, ArcGISTiledMapServiceLayer, Locator, Graphic,
+        InfoTemplate, SimpleMarkerSymbol, PictureMarkerSymbol,
+        Font, TextSymbol,
+        arrayUtils, Color,
+        number, parser, dom, registry
+      ) {
+          parser.parse();
+
+          map = new Map("map", {
+              logo: false,
+              extent: new Extent({ "xmin": 288800, "ymin": 5240000, "xmax": 348000, "ymax": 5295000, "spatialReference": { "wkid": 32181} })
+          });
+
+          var basemap = new ArcGISTiledMapServiceLayer("http://map.stjohns.ca/Arcgis/rest/services/MapCentre/STJ_Basemap_Topo_MapService/MapServer");
+          map.addLayer(basemap);
+
+          ortho = new esri.layers.ArcGISTiledMapServiceLayer("http://map.stjohns.ca/ArcGIS/rest/services/MapCentre/STJ_MC_Ortho_2013_MapService/MapServer", { visible: false });
+
+          map.addLayer(ortho);
+
+          map.on("load", locate);
+
+          locator = new Locator("http://map.stjohns.ca/ArcGIS/rest/services/STJ_Geocode_Service/GeocodeServer");
+          locator.on("address-to-locations-complete", showResults);
+
+          map.infoWindow.resize(200, 125);
+
+
+
+
+
+          function locate() {
+              map.graphics.clear();
+
+              strBusinessName = getParameterByName('BusinessName');
+              var strCivic = getParameterByName('Civic');
+              var strStreetName = getParameterByName('StreetName');
+              var strCivicAlpha = getParameterByName('CivicAlpha');
+              var tmp = strCivic + strCivicAlpha + " " + strStreetName;
+
+              var address = {
+                  "SingleLine": tmp
+              };
+
+              strSecAddInd = getParameterByName('SecAddInd');
+              if (strSecAddInd == '') strSecAddInd = ""; else strSecAddInd = strSecAddInd + " ";  //"Suite-Unit-Apart";
+
+              strUnit = getParameterByName('Unit');
+              if (strUnit == '') strUnit = ''; else strUnit += "<br />"; // "N/A";
+
+              strSecondAddress = getParameterByName('SecondAddress');
+              if (strSecondAddress == '') strSecondAddress = ''; else strSecondAddress += "<br />"; //'N/A'
+
+              locator.outSpatialReference = map.spatialReference;
+              var options = {
+                  address: address,
+                  outFields: ["Loc_name"]
+              }
+
+              locator.addressToLocations(options);
+
+          }
+
+          function getParameterByName(name) {
+              name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+              var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+              results = regex.exec(location.search);
+              return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+          }
+
+          function showResults(evt) {
+              var candidate;
+              //var symbol = new SimpleMarkerSymbol();
+              var infoTemplate = new InfoTemplate(
+            "Location",
+            "<span style='font-weight: bold;'>${businessName}</span><br />${address}<br />${SecAdd}${suit}${secondAdress}${city}"
+          );
+              //jmp removed labels on location information "Address: ${address}<br />${SecAdd}: ${suit}<br />Other Address Info: ${secondAdress}"
+
+              //symbol.setStyle(SimpleMarkerSymbol.STYLE_SQUARE);
+              //symbol.setColor(new Color([153,0,51,0.75]));
+
+              var symbol = new esri.symbol.PictureMarkerSymbol
+            ({ "angle": 0, "xoffset": 0, "yoffset": 20, "type": "esriPMS",
+                "url": "../images/MapIt2_24x36.png",
+                "contentType": "image/png", "width": 24, "height": 36
+            });
+
+
+              var geom;
+              arrayUtils.every(evt.addresses, function(candidate) {
+                  console.log(candidate.score);
+                  if (candidate.score > 80) {
+                      console.log(candidate.location);
+
+                      var tmpAddress = candidate.address;
+                      var tmpAddress2 = tmpAddress.split(",");
+
+                      var attributes = {
+                          businessName: strBusinessName,
+                          address: tmpAddress2[0].toTitleCase(),
+                          city: tmpAddress2[1].toTitleCase(),
+                          SecAdd: strSecAddInd,
+                          suit: strUnit,
+                          secondAdress: strSecondAddress
+                      };
+                      geom = candidate.location;
+                      var graphic = new Graphic(geom, symbol, attributes, infoTemplate);
+
+                      //add a graphic to the map at the geocoded location
+                      map.graphics.add(graphic);
+
+                      //Change the cursor
+                      map.graphics.enableMouseEvents();
+                      dojo.connect(map.graphics, "onMouseOver", function(event) {
+                          map.setMapCursor("pointer"); // jmp changed from help to pointer
+                      });
+                      dojo.connect(map.graphics, "onMouseOut", function(event) {
+                          map.setMapCursor("default");
+                      });
+
+                      //add a text symbol to the map listing the location of the matched address.
+                      //var displayText = candidate.address;
+                      var displayText = strBusinessName;
+                      var font = new Font(
+                "16pt",
+                Font.STYLE_NORMAL,
+                Font.VARIANT_NORMAL,
+                Font.WEIGHT_BOLD,
+                "Helvetica"
+              );
+
+                      var textSymbol = new TextSymbol(
+                displayText,
+                font,
+                      //new Color("#666633")
+                new Color("#0000ff")
+              );
+                      textSymbol.setOffset(0, -20);
+                      map.graphics.add(new Graphic(geom, textSymbol, attributes, infoTemplate));
+                      return false; //break out of loop after one candidate with score greater  than 80 is found.
+                  }
+                  else {
+                      alert("Address not found in our service.");
+                      return false;
+                  }
+              });
+              if (geom !== undefined) {
+                  map.centerAndZoom(geom, 7);
+              }
+          }
+
+
+      });
+
+      function toggleMap() {
+        if (ortho.visible == false)
+        {
+          ortho.show();
+          document.getElementById('tinyMap').src = "../images/topo_60x60.PNG";
+        }
+        else
+        {
+          ortho.hide();
+          document.getElementById('tinyMap').src = "../images/ortho_60x60.PNG";
+        }
+      }
+      
+    </script>
+  </head>
+  <body class="claro">
+    <div id="mainWindow" data-dojo-type="dijit/layout/BorderContainer" 
+         data-dojo-props="design:'sidebar', gutters:false" 
+         style="width:100%; height:100%;">
+
+
+      <div id="map" 
+           data-dojo-type="dijit/layout/ContentPane" 
+           data-dojo-props="region:'center'">
+        <div id="toggleMap" >
+        <input id="tinyMap" type="image" title="Switch the Base map" src="../images/ortho_60x60.PNG" onClick="toggleMap()">
+          </div>
+      </div>
+    </div>
+  </body>
+</html>

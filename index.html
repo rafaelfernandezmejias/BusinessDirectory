@@ -1,0 +1,24 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>HTML5 test geocode.html</title>
+  <meta name="description" content="HTML5 test geocode.html">
+  <meta name="author" content="SitePoint">
+  <script>
+	function MapIt_click(strCivic, strStreetName, strCivicAlpha, strSecAddInd, strUnit, strAddress2, strBusinessName)
+	{
+		strBusinessName = strBusinessName.replace("&", "-");
+		window.open("geocode-NEW.html?Civic=" + strCivic + "&StreetName=" + strStreetName + "&CivicAlpha=" + strCivicAlpha + "&SecAddInd=" + strSecAddInd  + "&Unit=" + strUnit  + "&SecondAddress=" + strAddress2 + "&BusinessName=" + strBusinessName, "_blank","toolbar=0, scrollbars=no, resizable=yes, top=300, left=300, width=600, height=400");
+	}
+</script>
+ 
+</head>
+
+<body>
+<button type="button" onClick="MapIt_click('215', 'WATER ST','', 'SUITE ', '802','','Maderra Engineering Inc.')">Click Me!</button> 
+  
+</body>
+</html>
